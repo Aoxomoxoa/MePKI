@@ -25,7 +25,7 @@ Small PKI project
 
 # Как подтянуть репозиторий себе
 
-`git clone https://Aoxomoxoa@bitbucket.org/Aoxomoxoa/pki.git *foldername*`
+`git clone https://github.com/Aoxomoxoa/MePKI.git *foldername*`
 По умолчанию (без указания foldername) репозиторий подтянется в ту папку, где была выполнена команда
 
 # Некоторые крайне полезные команды:
