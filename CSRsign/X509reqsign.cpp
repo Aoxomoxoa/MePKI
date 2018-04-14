@@ -88,6 +88,8 @@ bool write_to_disk(X509 *x509)
 int request_signing(X509_REQ *certificate_request, X509 * certificate, EVP_PKEY *pkey, int days, const EVP_MD *(*EVP_sha)())
 {
 	int bytes;
+	srand(time(NULL));
+	int random_value = rand();
 	std::cout << "[info]    Start generating certificate from CSR" << std::endl;
 	if (X509_REQ_sign(certificate_request, pkey, EVP_sha()) == 0)
 	{
@@ -107,6 +109,8 @@ int request_signing(X509_REQ *certificate_request, X509 * certificate, EVP_PKEY 
 	}
 	bytes = X509_sign(certificate, pkey, EVP_sha());
 	std::cout << "[success] Certificate is successfuly generated" << std::endl;
+	/* Set the serial number. */
+	ASN1_INTEGER_set(X509_get_serialNumber(certificate), random_value);
 	bool ret = write_to_disk(certificate);
 	return bytes;
 }
