@@ -1,5 +1,6 @@
 #include "X509reqsign.h"
 #include <string>
+#include <fstream>
 
 void print_x509_req(X509_REQ* x509_req)
 {
@@ -88,8 +89,39 @@ bool write_to_disk(X509 *x509)
 int request_signing(X509_REQ *certificate_request, X509 * certificate, EVP_PKEY *pkey, int days, const EVP_MD *(*EVP_sha)())
 {
 	int bytes;
+	int Snumber;
+	bool serial_is_unique = true;
 	srand(time(NULL));
-	int random_value = rand();
+	int random_value;
+	std::ifstream CA_DB_file;
+	std::string line_with_Snumber;
+	CA_DB_file.open("CA_DB");
+	/*check for CA_DB*/
+	if (!CA_DB_file) {
+		std::cout << "[error]   Unable to open CA_DB file";
+	}
+	/*check if this number is unique*/
+	do
+	{
+		random_value = rand();
+
+		while (std::getline(CA_DB_file, line_with_Snumber))
+		{
+				Snumber = std::stoi(line_with_Snumber);
+				if (Snumber == random_value)
+				{
+					serial_is_unique = false;
+					break;
+				}
+			}
+	CA_DB_file.seekg(0, CA_DB_file.beg);
+	} while (!serial_is_unique);	CA_DB_file.close();
+	//write new serial number in file
+	std::ofstream CA_DB_file_for_W;
+	CA_DB_file_for_W.open("CA_DB", std::ios_base::app);
+	CA_DB_file_for_W << random_value << std::endl;
+	CA_DB_file_for_W.close();
+	
 	std::cout << "[info]    Start generating certificate from CSR" << std::endl;
 	if (X509_REQ_sign(certificate_request, pkey, EVP_sha()) == 0)
 	{
@@ -98,7 +130,6 @@ int request_signing(X509_REQ *certificate_request, X509 * certificate, EVP_PKEY 
 	}
 	bytes = X509_REQ_sign(certificate_request, pkey, EVP_sha());
 	std::cout << "[success] CSR is signed" << std::endl;
-	
 	
 	certificate = X509_REQ_to_X509(certificate_request, days, pkey);
 	
@@ -114,4 +145,3 @@ int request_signing(X509_REQ *certificate_request, X509 * certificate, EVP_PKEY 
 	bool ret = write_to_disk(certificate);
 	return bytes;
 }
-
