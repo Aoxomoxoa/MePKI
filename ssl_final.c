@@ -17,6 +17,7 @@ int create_socket(char[], BIO *);
 
 int main() {
 
+// init all structures
   char            dest_url[128];
   BIO              *certbio = NULL;
   BIO               *outbio = NULL;
@@ -26,6 +27,7 @@ int main() {
   ASN1_TIME      *notBefore = NULL;
   ASN1_TIME       *notAfter = NULL;
 
+// init all variables
   const SSL_METHOD *method;
   SSL_CTX *ctx;
   SSL *ssl;
@@ -33,26 +35,31 @@ int main() {
   int ret, i, res;
   long is_valid;
 
+// load some functional abilities
   OpenSSL_add_all_algorithms();
   ERR_load_BIO_strings();
   ERR_load_crypto_strings();
   SSL_load_error_strings();
 
+// init input and output buffers
   certbio = BIO_new(BIO_s_file());
   outbio  = BIO_new_fp(stdout, BIO_NOCLOSE);
 
   if(SSL_library_init() < 0)
     BIO_printf(outbio, "Could not initialize the OpenSSL library !\n");
 
+// set connection method
   method = SSLv23_client_method();
 
   if ( (ctx = SSL_CTX_new(method)) == NULL)
     BIO_printf(outbio, "Unable to create a new SSL context structure.\n");
-  
+ 
+// load certificate chain 
   res = SSL_CTX_load_verify_locations(ctx, "chain.pem", NULL);
 
   if (res == 0) printf("Chain file is not found\n");
 
+// do not use the SSLv2 protocol
   SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
 
   ssl = SSL_new(ctx);
@@ -60,10 +67,12 @@ int main() {
   printf("Enter destination url (format: https://example.com): \n");
   scanf("%s", dest_url);
 
+// create socket for connection
   server = create_socket(dest_url, outbio);
   if(server != 0)
     BIO_printf(outbio, "--Successfully made the TCP connection to:-- \n %s.\n", dest_url);
 
+// set the file descriptor as the input/output facility for the TLS/SSL
   SSL_set_fd(ssl, server);
 
   if ( SSL_connect(ssl) != 1 )
@@ -71,6 +80,7 @@ int main() {
   else
     BIO_printf(outbio, "--Successfully enabled SSL/TLS session to:-- \n %s.\n", dest_url);
 
+// get the X509 certificate of the peer
   cert = SSL_get_peer_certificate(ssl);
   if (cert == NULL)
     BIO_printf(outbio, "Error: Could not get a certificate from: \n %s.\n", dest_url);
@@ -80,9 +90,24 @@ int main() {
  if (cert)
     X509_free(cert);
 
+/*
+  returns the result of the verification:
+  0  - cert is OK;
+  18 - self-signed cert;
+  20 - cert is not trusted
+*/
   is_valid = SSL_get_verify_result(ssl);
-  printf("Is valid: %lu\n", is_valid);
+  switch(is_valid)   
+  {
+    case '0':
+      printf("Code 0 - certificate is valid"); 
+    case '18':
+      printf("Code 18 - self-signed certificate");   
+    default :
+      printf("Code 20 - certificate is not trusted");  
+  }  
 
+// get all certificate data
   certname = X509_NAME_new();
   certname = X509_get_subject_name(cert);
   certissuer = X509_get_issuer_name(cert);
@@ -90,6 +115,7 @@ int main() {
   notBefore = X509_getm_notBefore(cert);
   notAfter = X509_getm_notAfter(cert);
 
+// display all certificate data
   BIO_printf(outbio, "--Displaying the certificate subject data:--\n");
   X509_NAME_print_ex(outbio, certname, 0, 0);
   BIO_printf(outbio, "\n");
@@ -106,6 +132,7 @@ int main() {
   ASN1_STRING_print_ex(outbio, notAfter, ASN1_STRFLGS_ESC_QUOTE);
   BIO_printf(outbio, "\n");
 
+// free memory after usage
   SSL_free(ssl);
   shutdown(server, 2);
   SSL_CTX_free(ctx);
@@ -113,6 +140,7 @@ int main() {
   return(0);
 }
 
+// function to parse url and create socket
 int create_socket(char url_str[], BIO *out) {
   int sockfd;
   char hostname[256] = "";
