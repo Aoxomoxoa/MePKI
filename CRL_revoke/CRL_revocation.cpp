@@ -1,4 +1,4 @@
-#include "crlrvk.h"
+﻿#include "crlrvk.h"
 #include <string>
 #include <fstream>
 
@@ -16,13 +16,8 @@ X509 * read_from_disk(const char *filepath)
 
 	cert = PEM_read_X509(cert_file, NULL, 0, NULL);
 	fclose(cert_file);
-	if (!cert)
-	{
-		std::cerr << "[error]   Unable request from disk." << std::endl;
-		return NULL;
-	}
-	std::cout << "[success] Cert file have been read successful" << std::endl;
 
+	std::cout << "[success] Cert file have been read successful" << std::endl;
 	return cert;
 
 }
@@ -31,26 +26,32 @@ void parse_arguments(int &rev_type, int &certSerial, bool &isRevoke, bool &isVer
 	std::string certFile;
 	const char* certFile_filepath = "cert.pem";
 	X509 *cert;
-	if (argc == 4)
-	{
-		certFile = argv[3];
-		certFile_filepath = certFile.c_str();
-	}
+
 	for (int i = 0; i < argc; ++i)
 	{
-		// if revoke
+		// if revoke. 
 		if (strcmp(argv[i], "--revoke") == 0)
 		{
+			//check for wrong entry
 			if ((argc == 1) || (argc == 2) || (argc == 3) || (argc > 4))
 			{
 				std::cout << "Usage: --revoke <rev_type> <cert_filename>" << std::endl;
 				return;
 			}
 			rev_type = atoi(argv[i + 1]);
+			certFile = argv[i + 2];
+			certFile_filepath = certFile.c_str();
 			cert = read_from_disk(certFile_filepath);
 			if (cert == NULL)
+			{
+				std::cerr << "[error]   Unable to open cert file with filename " << certFile_filepath << std::endl;
 				return;
+			}
 			isRevoke = true;
+			/*
+			X509_get_serialNumber returns type ASN1_INTEGER, 
+			when ASN1_INTEGER_get return value ASN1_INTEGER in int
+			*/
 			certSerial = ASN1_INTEGER_get(X509_get_serialNumber(cert));
 		}
 
@@ -66,7 +67,10 @@ void parse_arguments(int &rev_type, int &certSerial, bool &isRevoke, bool &isVer
 			certFile_filepath = certFile.c_str();
 			cert = read_from_disk(certFile_filepath);
 			if (cert == NULL)
+			{
+				std::cerr << "[error]   Unable to open cert file with filename " << certFile_filepath << std::endl;
 				return;
+			}
 			isVerify = true;
 			certSerial = ASN1_INTEGER_get(X509_get_serialNumber(cert));
 		}
@@ -91,6 +95,13 @@ void do_revoke(int &rev_type, int &certSerial)
 	}
 	//open CRL database for reading
 	CRL_DB_R.open("CRL_DB");
+	/*
+	check if certificate with this serial nubmer is already revoked
+	This is a bit tricky. I read CRL_DB_R in certSerial_str line with delimiter 'space' and then the rest of it with delimiter '/n'
+	i.e. line: 452 1
+	read till 'space' → 452
+	read the rest till /n → 1 
+	*/
 	for (std::string certSerial_str, rev_reason_str;
 		std::getline(CRL_DB_R, certSerial_str, ' ') && std::getline(CRL_DB_R, rev_reason_str);
 		)
@@ -137,7 +148,7 @@ void do_verify(int &certSerial)
 				std::cout << " because certificate key is compromised" << std::endl;
 				break;
 			case 3:
-				std::cout << " because  CA key is compromised" << std::endl;
+				std::cout << " because CA key is compromised" << std::endl;
 				break;
 			default:
 				std::cout << std::endl << "[error]   wrong revokation reason code" << std::endl;
